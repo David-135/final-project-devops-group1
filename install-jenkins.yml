@@ -1,0 +1,85 @@
+---
+- name: Ansible Playbook for Installing the Open Source Jenkins
+  hosts: jenkins-server
+  become: yes
+  remote_user: ec2-user
+  become_user: root
+  tasks:
+    - name: Install the Jenkins Pre-requisites
+      yum:
+        name:
+          - wget
+          - java-11-openjdk
+
+    - name: Download the Open Source jenkins.repo
+      get_url:
+        url: http://pkg.jenkins-ci.org/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+
+    - name: Import the  Open Source Jenkins Key
+      rpm_key:
+        state: present
+        key: https://jenkins-ci.org/redhat/jenkins-ci.org.key
+
+    - name: Install the Jenkins Package
+      yum:
+        name: jenkins
+        state: present
+
+    - name: Start & Enable Jenkins
+      systemd:
+        name: jenkins
+        state: started
+        enabled: true
+
+    - name: Sleep for 30 seconds and continue with play
+      wait_for: timeout=30
+
+    - name: Get the init password Jenkins
+      shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+      changed_when: false
+      register: password
+
+    - name: Print init password Jenkins
+      debug:
+        var: password.stdout
+
+    - name: Install Git
+      yum:
+        name: git
+        state: latest
+
+    - name: Install yum utils
+      yum:
+        name: yum-utils
+        state: latest
+
+
+    - name: Add Docker repo
+      get_url:
+        url: https://download.docker.com/linux/centos/docker-ce.repo
+        dest: /etc/yum.repos.d/docker-ce.repo
+
+
+    - name: Install Docker
+      yum:
+        name: docker-ce 
+        state: latest
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+  
+    - name: Add user ec2-user to docker group
+      user:
+        name: ec2-user
+        groups: docker
+        append: yes
+
+    - name: change permisson
+      file:
+        path: /var/run/docker.sock
+        mode: 0666  
+  
